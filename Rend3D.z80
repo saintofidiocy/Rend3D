@@ -1,0 +1,295 @@
+.nolist
+
+.sym "Rend3D.sym"     ; export all labels for debugger
+
+
+; System variable addresses
+GBuffA        .equ $86EC  ;saveSScreen
+GBuffB        .equ $9340  ;plotSScreen
+ProgStart     .equ $9D95
+appData       .equ $8000
+ramCode       .equ $8100
+
+; I/O ports
+KeyboardPort  .equ $01
+LCDinstPort	  .equ $10
+LCDdataPort   .equ $11
+
+
+; System routine to pause until LCD is ready to accept commands
+LCD_Busy_Wait .equ $000b
+
+
+; Macro to fill memory to the next 'b'-byte boundary
+#define  align(b)  .fill b-$&(b-1)
+
+
+; t increment = 1 / 2^SlerpSteps
+#define  SlerpSteps  5
+; 0 = 1 step
+; 1 = 2 steps
+; 2 = 4 steps
+; 3 = 8 steps
+; 4 = 16 steps
+; 5 = 32 steps
+; ...
+
+; 1 TState = 1/6000000 s
+; Max size: 8811
+; Limit to ~150 pushes ... 100 to be safe (Will it ever get that large?)
+
+
+; Program entry point
+.org ProgStart-2
+.db $BB,$6D ; asm program header
+.list
+  
+  call getVData
+  call LoadVData
+  di ; no interrupting, thanks.
+  exx
+  ex af,af'
+  push af
+  push bc
+  push de
+  push hl
+  push iy ; Store shadow & system registers
+  call MainLoop
+  pop iy ; Restore shadow & system registers
+  pop hl
+  pop de
+  pop bc
+  pop af
+  ex af,af'
+  exx
+  ei
+  ret
+
+VDatName: ; Name of vertex data object to load -- value is written here by calling that program first
+  .db 0,0,0,0,0,0,0,0,0,0
+VData: ; Pointer to vertex data memory
+  .dw $0000
+
+; Loads vertex data pointers
+LoadVData:
+  ld de,6 ; skip past VData header
+  ld (VData),hl
+  add hl,de ; hl = VData.VertexCount
+  ld de, CPos
+  ld bc, 14 ; sizeof(CPos) + sizeof(VCount) + sizeof(TCount)
+  
+  ldir ; CPos = VData.CameraPos
+       ; VertexCount = VData.VertexCount
+       ; TriangleCount = VData.TriangleCount
+  ex de,hl ; de = VData.VListPtr
+  
+  ld hl,(VData)
+  ex de,hl
+  ld c,(hl)
+  inc hl
+  ld b,(hl)
+  inc hl
+  ex de,hl
+  add hl,bc
+  ld (VertexList),hl ; VertexList = VData.VList
+  
+  ld hl,(VData)
+  ex de,hl
+  ld c,(hl)
+  inc hl
+  ld b,(hl)
+  inc hl
+  ex de,hl
+  add hl,bc
+  ld (TriangleList),hl ; TriangleList = VData.TList
+  
+  ld hl,(VData)
+  ex de,hl
+  ld c,(hl)
+  inc hl
+  ld b,(hl)
+  inc hl
+  ex de,hl
+  add hl,bc
+  ld (NormalList),hl ; NormalList = VData.NList
+  
+  ld hl,(VData)
+  ex de,hl
+  ld c,(hl)
+  inc hl
+  ld b,(hl)
+  inc hl
+  ex de,hl
+  add hl,bc
+  ld (VertexListCalc),hl ; VertexListCalc = VData.VListCalc
+  
+  ld hl,(VData)
+  ex de,hl
+  ld c,(hl)
+  inc hl
+  ld b,(hl)
+  ;inc hl
+  ex de,hl
+  add hl,bc
+  ld (TriangleSort),hl ; TriangleSort = VData.TSort
+  
+  ret
+
+
+; Main program code
+; All registers & shadow registers are available for use.
+MainLoop:
+  
+  ld hl,RotM
+  call RotXYZ ; randomize rotation matrix
+  call RotMtoQ1 ; Q1 = Quat(RotM)
+  
+  ld ix,Q0
+  ld iy,Q1
+  
+  ; acc = (Q0·Q1)
+  ld a,(ix+Q_A)
+  ld l,(ix+Q_A+1)
+  ld h,(ix+Q_A+2)
+  ld c,(iy+Q_A)
+  ld e,(iy+Q_A+1)
+  ld d,(iy+Q_A+2)
+  call fMult ; Q0A * Q1A
+  exx \ ex af,af' ; acc = Q0A * Q1A
+  ld a,(ix+Q_B)
+  ld l,(ix+Q_B+1)
+  ld h,(ix+Q_B+2)
+  ld c,(iy+Q_B)
+  ld e,(iy+Q_B+1)
+  ld d,(iy+Q_B+2)
+  call fMult ; Q0B * Q1B
+  call fAddAcc
+  exx \ ex af,af' ; acc = Q0A * Q1A + Q0B * Q1B
+  ld a,(ix+Q_C)
+  ld l,(ix+Q_C+1)
+  ld h,(ix+Q_C+2)
+  ld c,(iy+Q_C)
+  ld e,(iy+Q_C+1)
+  ld d,(iy+Q_C+2)
+  call fMult ; Q0C * Q1C
+  call fAddAcc
+  exx \ ex af,af' ; acc = Q0A*Q1A + Q0B*Q1B + Q0C*Q1C
+  ld a,(ix+Q_D)
+  ld l,(ix+Q_D+1)
+  ld h,(ix+Q_D+2)
+  ld c,(iy+Q_D)
+  ld e,(iy+Q_D+1)
+  ld d,(iy+Q_D+2)
+  call fMult ; Q0D * Q1D
+  call fAddAcc ; AHLDE = Q0A*Q1A + Q0B*Q1B + Q0C*Q1C + Q0D*Q1D
+  
+  ld b,$80 ; sign bit
+  and b ; acc < 0 ?
+  jr z,NoNeg
+  
+  ; (Q0·Q1) < 0; Invert Q1
+  ld a,(Q1+Q_B)
+  xor b ; invert sign
+  ld (Q1+Q_B),a
+  ld a,(Q1+Q_C)
+  xor b ; invert sign
+  ld (Q1+Q_C),a
+  ld a,(Q1+Q_D)
+  xor b ; invert sign
+  ld (Q1+Q_D),a
+  
+NoNeg:
+  ld a,$BF \ ld hl,$8000 ; theta = 0
+  
+SlerpLoop:
+;T = (theta*(2-abs(theta))+1)/2
+;  approx 1-(1-sin(theta*pi/2))/2, for a nice smooth start and stop
+  cp $3F ; sgn == 0 && exp == 0
+  jr nz,calcTCont ; theta != $3F8000
+  
+; theta >= $3F8000, reset
+  ld hl,Q1
+  ld de,Q0
+  ld bc,12 ; sizeof(Q1)
+  ldir ; Q0 = Q1
+  
+  ld a,(RotCount)
+  dec a
+  ret z
+  ld (RotCount),a
+  jp MainLoop ; loop forever
+
+calcTCont
+  push af \ push hl ; preserve theta through SlerpLoop ...
+  
+  push af \ push hl ; theta
+  or $80 ; -|theta|
+  ld c,$40 \ ld de,$8000 ; CDE = 2
+  call fAdd ; (2-|theta|)
+  pop de \ pop bc \ ld c,b ; CDE = theta
+  call fMult ; theta*(2-|theta|)
+  call fTrunc
+  ld c,$3F \ ld de,$8000 ; CDE = 1
+  call fAdd ; AHL + 1
+  call fDiv2 ;dec a ; (theta*(2-|theta|) + 1)/2
+  ld (T),a \ ld (T+1),hl ; T = AHL
+ 
+  ;inline Slerp
+  ; QC = Q0 * ((q0^-1)*q1)^t
+#include "il_slerp.inc"
+  
+  ;inline Quat to RotM
+#include "il_qtom.inc"
+  
+  call ClearBuffer
+  
+  ;inline Render
+#include "il_rend.inc"
+  
+  call DrawBuffer
+  
+; Finish Loop
+  pop hl \ pop af ; restore theta
+  ld c,(64-SlerpSteps) ; SlerpSteps Exponent
+  ld de,$8000
+  call fAdd ; theta += 2^-(SlerpSteps-1)
+  
+  ld b,a
+  ;ld a,(Exit) ; exit value used if key detection is in interrupt handler
+  ;or a
+  ;ld a,b
+  
+  ; keyboard input?
+  ld a,$fd
+  out (KeyboardPort),a
+  in a,(KeyboardPort)
+  cp $bf
+  ld a,b
+  
+  jp nz,SlerpLoop ; Exit == 0
+  
+  ld a,$ff
+  out (KeyboardPort),a ; reset keyboard
+  
+  ret
+
+
+#include "float.inc"
+#include "mult.inc"
+#include "div.inc"
+#include "add.inc"
+#include "mat.inc"
+#include "quat.inc"
+#include "math.inc"
+#include "draw.inc"
+
+#include "findsym.inc"
+#include "vars.inc"
+
+; label points for debugger
+#include "exports.inc"
+
+; throws an error if program is too big
+#include "fsizechk.inc"
+
+.end

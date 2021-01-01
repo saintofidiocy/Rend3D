@@ -1,0 +1,3 @@
+- Put TASM.EXE here from https://www.ticalc.org/archives/files/fileinfo/250/25051.html
+  *** TASM80.TAB should go in the root directory, because it won't read it from a subdirectory ***
+- Put binpac8x.py here from https://www.ticalc.org/archives/files/fileinfo/429/42915.html

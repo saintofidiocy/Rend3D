@@ -1,0 +1,81 @@
+; Include Vertex Data Header
+#include "VData.inc"
+
+; --- Data ---
+
+; Program filename
+SelfName:
+  .db ProtProgObj,"VICOS",0,0,0,0
+
+
+; Vertices
+VList:
+  .db float($000000), float($C08000), float($40CF1C) ; 0
+  .db float($000000), float($408000), float($40CF1C) ; 1
+  .db float($000000), float($408000), float($C0CF1C) ; 2
+  .db float($000000), float($C08000), float($C0CF1C) ; 3
+  .db float($408000), float($C0CF1C), float($000000) ; 4
+  .db float($408000), float($40CF1C), float($000000) ; 5
+  .db float($C08000), float($40CF1C), float($000000) ; 6
+  .db float($C08000), float($C0CF1C), float($000000) ; 7
+  .db float($40CF1C), float($000000), float($408000) ; 8
+  .db float($40CF1C), float($000000), float($C08000) ; 9
+  .db float($C0CF1C), float($000000), float($C08000) ; 10
+  .db float($C0CF1C), float($000000), float($408000) ; 11
+
+
+; Triangles (ccw vertex order)
+TList:
+  .db 0, 1, 8
+  .db 0, 8, 4
+  .db 0, 4, 7
+  .db 0, 7,11
+  .db 0,11, 1
+  .db 6, 1,11
+  .db 6,11,10
+  .db 6,10, 2
+  .db 6, 2, 5
+  .db 6, 5, 1
+  .db 9, 2, 3
+  .db 9, 3, 4
+  .db 9, 4, 8
+  .db 9, 8, 5
+  .db 9, 5, 2
+  .db 1, 5, 8
+  .db 7,10,11
+  .db 7, 3,10
+  .db 7, 4, 3
+  .db 2,10, 3
+
+
+; Triangle normals
+NList:
+  .db float($3DB6B2), float($800000), float($3EEF26)
+  .db float($3E93CE), float($BE93CE), float($3E93CE)
+  .db float($000000), float($BEEF26), float($3DB6B2)
+  .db float($BE93CE), float($BE93CE), float($3E93CE)
+  .db float($BDB6B2), float($000000), float($3EEF26)
+  .db float($BE93CE), float($3E93CE), float($3E93CE)
+  .db float($BEEF26), float($3DB6B2), float($000000)
+  .db float($BE93CE), float($3E93CE), float($BE93CE)
+  .db float($000000), float($3EEF26), float($BDB6B2)
+  .db float($800000), float($3EEF26), float($3DB6B2)
+  .db float($3DB6B2), float($000000), float($BEEF26)
+  .db float($3E93CE), float($BE93CE), float($BE93CE)
+  .db float($3EEF26), float($BDB6B2), float($000000)
+  .db float($3EEF26), float($3DB6B2), float($800000)
+  .db float($3E93CE), float($3E93CE), float($BE93CE)
+  .db float($3E93CE), float($3E93CE), float($3E93CE)
+  .db float($BEEF26), float($BDB6B2), float($000000)
+  .db float($BE93CE), float($BE93CE), float($BE93CE)
+  .db float($000000), float($BEEF26), float($BDB6B2)
+  .db float($BDB6B2), float($800000), float($BEEF26)
+
+
+
+; --- End Data ---
+
+; Include Vertex Data Footer
+#include "VDataEnd.inc"
+
+.end

@@ -1,0 +1,120 @@
+.nolist
+#define  ProgStart   $9D95
+
+
+; Rend3D.z80 exports for VObj file linking
+#include "Rend3D.exp"
+
+.org ProgStart-2
+.db $BB,$6D
+.list
+  jr _main
+
+
+#define VCount (TList-VList)/9 ; auto-count
+#define TCount (NList-TList)/3 ; auto-count
+
+CameraPos:
+  .db $00,$00,$00 ; X
+  .db $00,$00,$00 ; Y
+  .db $42,$00,$C0 ; Z = 12
+  .db $00,$00,$00 ; W
+
+VertexCount:
+  .db VCount ; auto-count
+TriangleCount:
+  .db TCount ; auto-count
+
+VListPtr:
+  .dw VList-ProgStart+4
+TListPtr:
+  .dw TList-ProgStart+4
+NListPtr:
+  .dw NList-ProgStart+4
+VListCalcPtr:
+  .dw VListCalc-ProgStart+4
+TSortPtr:
+  .dw TSort-ProgStart+4
+
+_main:
+  call getVData
+  ld de,Rend3D.VDatName
+  add hl,de
+  ex de,hl ; de = Rend3D.VDatName
+  ld hl,SelfName
+  ld bc,9
+  ldir  ; Rend3D.VDatName = SelfName
+  ld hl,textDone
+  jr vDataError+1 ; skip the pop
+
+#include "findsym.inc"
+
+textDone:
+  .db "Vertex Data Set",0
+
+SelfName:
+  .db 6,"VCUBE",0,0,0,0
+VDatName:
+  .db 6,"REND3D",0,0,0 ; 6 = ProtProgObj
+
+; --- Data ---
+
+VList:
+;     X            Y            Z
+  .db $C0,$00,$80, $40,$00,$80, $40,$00,$80
+  .db $40,$00,$80, $40,$00,$80, $40,$00,$80
+  .db $40,$00,$80, $C0,$00,$80, $40,$00,$80
+  .db $C0,$00,$80, $C0,$00,$80, $40,$00,$80
+  .db $40,$00,$80, $40,$00,$80, $C0,$00,$80
+  .db $C0,$00,$80, $40,$00,$80, $C0,$00,$80
+  .db $C0,$00,$80, $C0,$00,$80, $C0,$00,$80
+  .db $40,$00,$80, $C0,$00,$80, $C0,$00,$80
+TList:
+;     A B C
+  .db 0,1,2
+  .db 0,2,3
+  
+  .db 1,4,7
+  .db 1,7,2
+  
+  .db 4,5,6
+  .db 4,6,7
+  
+  .db 5,0,3
+  .db 5,3,6
+  
+  .db 3,2,7
+  .db 3,7,6
+  
+  .db 5,4,1
+  .db 5,1,0
+NList:
+;     X            Y            Z
+  .db $00,$00,$00, $00,$00,$00, $3F,$00,$80
+  .db $00,$00,$00, $00,$00,$00, $3F,$00,$80
+  
+  .db $3F,$00,$80, $00,$00,$00, $00,$00,$00
+  .db $3F,$00,$80, $00,$00,$00, $00,$00,$00
+  
+  .db $00,$00,$00, $00,$00,$00, $BF,$00,$80
+  .db $00,$00,$00, $00,$00,$00, $BF,$00,$80
+  
+  .db $BF,$00,$80, $00,$00,$00, $00,$00,$00
+  .db $BF,$00,$80, $00,$00,$00, $00,$00,$00
+  
+  .db $00,$00,$00, $BF,$00,$80, $00,$00,$00
+  .db $00,$00,$00, $BF,$00,$80, $00,$00,$00
+  
+  .db $00,$00,$00, $3F,$00,$80, $00,$00,$00
+  .db $00,$00,$00, $3F,$00,$80, $00,$00,$00
+VListCalc:
+  .fill VCount*3*3 ; same size as VList
+TSort:
+  .fill TCount*4 ; {char Index, float Z}
+
+; --- End Data ---
+
+; Throws an error if program is too big.
+#include "fsizechk.inc"
+
+.end

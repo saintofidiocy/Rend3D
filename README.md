@@ -17,7 +17,7 @@ If you don't already have the means to assemble the source, this is how I have d
  5. Load the .8xp files to your favorite calculator or emulator, run `Asm(prgmVCUBE` to select that model, then `Asm(prgmREND3D`.
 Hold the Clear key to exit.
 
-I have only tested this on a phyisical TI-83+ calculator and on the TI-83+ SE in the TI-83 Plus Flash Debugger. As far as I can tell it works properly, but, as with any random assembly programs from the internet, use at your own risk.
+I have only tested this on a phyisical TI-83+ calculator and on the TI-83+ SE in the TI-83 Plus Flash Debugger. As far as I can tell it works properly, but as with any random assembly programs from the internet use at your own risk.
 
 #### 24-bit Floating Point Numbers
 Rather than rely on the calculator's built-in floating point numbers (which are essentially 9 bytes of a sort of floating point binary coded decimal) and have to use lots of system calls, I opted for a format based on a more standard float. The combinations of registers A+HL and C+DE are used as the floating point registers, similar to how z80 already combines two 8-bit registers to form the 16-bit registers. A and C contain the sign bit and exponent (with 63 as the bias), and HL or DE are the fraction bits. Essentially, `f = sgn(A) * (HL/32768) * 2^((A & 0x7F) - 63)`. The most significant bit of HL must explicitly have a "1", it is not implicit, as this simplified some of the math routines.

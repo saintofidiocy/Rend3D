@@ -15,3 +15,8 @@
 *.PDF	 diff=astextplain
 *.rtf	 diff=astextplain
 *.RTF	 diff=astextplain
+
+
+# Fix language detection
+*.inc linguist-language=Assembly
+*.z80 linguist-language=Assembly
